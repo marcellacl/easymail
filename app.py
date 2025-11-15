@@ -27,41 +27,33 @@ def upload():
             return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
         content = file.read().decode("utf-8")
+
         prompt = f"""
-        Você é um assistente que analisa textos.
-        Leia o conteúdo abaixo e retorne obrigatoriamente em JSON no formato:
+        Gere APENAS um JSON válido com o seguinte formato:
 
         {{
             "ia": {{
-                "classificacao": "",
-                "resumo": "",
-                "resposta_sugerida": ""
+                "classificacao": "produtivo ou improdutivo",
+                "resumo": "resumo do texto",
+                "resposta_sugerida": "resposta automática"
             }}
         }}
 
-        Texto analisado:
+        Conteúdo a analisar:
         {content}
         """
 
-        # API nova
+        # CHAMADA USANDO RESPONSE_FORMAT=JSON_SCHEMA
         response = client.chat.completions.create(
             model="gpt-4o-mini",
+            response_format={"type": "json_object"},
             messages=[{"role": "user", "content": prompt}]
         )
 
         raw = response.choices[0].message["content"]
 
-        # Tenta transformar a resposta da IA em JSON
         import json
-        try:
-            parsed = json.loads(raw)
-        except:
-            # Se a IA não retornar JSON válido, ainda retornamos o texto bruto
-            parsed = {"ia": {
-                "classificacao": "Erro ao interpretar resposta.",
-                "resumo": "-",
-                "resposta_sugerida": "-"
-            }}
+        parsed = json.loads(raw)
 
         return jsonify(parsed)
 
@@ -69,6 +61,8 @@ def upload():
         return jsonify({"error": str(e)}), 500
 
 
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+

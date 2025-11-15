@@ -1,12 +1,21 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from openai import OpenAI
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder="static",
+    template_folder="templates"
+)
+
 CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 
 @app.route("/api/upload", methods=["POST"])
@@ -18,28 +27,46 @@ def upload():
             return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
         content = file.read().decode("utf-8")
-        prompt = f"Analise o conteúdo do seguinte arquivo:\n\n{content}"
+        prompt = f"""
+        Você é um assistente que analisa textos.
+        Leia o conteúdo abaixo e retorne obrigatoriamente em JSON no formato:
 
-        # CHAMADA CORRETA PARA API NOVA
+        {{
+            "ia": {{
+                "classificacao": "",
+                "resumo": "",
+                "resposta_sugerida": ""
+            }}
+        }}
+
+        Texto analisado:
+        {content}
+        """
+
+        # API nova
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
 
-        result_raw = response.choices[0].message["content"]
+        raw = response.choices[0].message["content"]
 
-        return jsonify({
-            "success": True,
-            "analysis": result_raw
-        })
+        # Tenta transformar a resposta da IA em JSON
+        import json
+        try:
+            parsed = json.loads(raw)
+        except:
+            # Se a IA não retornar JSON válido, ainda retornamos o texto bruto
+            parsed = {"ia": {
+                "classificacao": "Erro ao interpretar resposta.",
+                "resumo": "-",
+                "resposta_sugerida": "-"
+            }}
+
+        return jsonify(parsed)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-@app.route("/")
-def home():
-    return "API running!"
 
 
 if __name__ == "__main__":
